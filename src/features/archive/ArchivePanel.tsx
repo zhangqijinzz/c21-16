@@ -5,7 +5,7 @@ import type { LatencyProject } from "../../shared/domain/types";
 interface Props {
   projects: LatencyProject[];
   activeId: string;
-  storageState: "saving" | "saved" | "error";
+  storageState: "saving" | "saved" | "error" | "conflict";
   notice: string;
   onChoose: (id: string) => void;
   onDuplicate: () => void;
@@ -50,12 +50,20 @@ export default function ArchivePanel({
             持久化项目数据，并保留本地恢复副本。刷新或重新打开后自动载入最近项目。
           </p>
           <div className="storage-status">
-            <i className={storageState === "error" ? "status-error" : ""} />
+            <i
+              className={
+                storageState === "error" || storageState === "conflict"
+                  ? "status-error"
+                  : ""
+              }
+            />
             {storageState === "saving"
               ? "正在保存更改…"
               : storageState === "error"
                 ? "保存遇到问题"
-                : "所有更改已保存"}
+                : storageState === "conflict"
+                  ? "检测到其他标签页改动，等待处理"
+                  : "所有更改已保存"}
           </div>
           {storageState === "error" && (
             <button className="text-action" onClick={onRetrySave}>

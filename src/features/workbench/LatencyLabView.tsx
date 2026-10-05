@@ -7,10 +7,13 @@ import {
   Plus,
   RadioTower,
   RotateCcw,
+  ShieldAlert,
   Sparkles,
   X,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useLatencyLab } from "./useLatencyLab";
+import ConflictDialog from "./ConflictDialog";
 import ProjectsPanel from "../projects/ProjectsPanel";
 import GraphEditor from "../graph-editor/GraphEditor";
 import SimulationPanel from "../simulation/SimulationPanel";
@@ -43,6 +46,13 @@ const navigation: NavigationItem[] = [
 
 export default function LatencyLabView() {
   const vm = useLatencyLab();
+  const [conflictOpen, setConflictOpen] = useState(true);
+  // 新一轮冲突（或对端在面板打开期间再次保存）时重新展开面板。
+  const conflictRevision = vm.conflict?.remoteRevision ?? "";
+  const conflictCount = vm.conflict?.conflicts.length ?? 0;
+  useEffect(() => {
+    if (vm.conflict) setConflictOpen(true);
+  }, [conflictRevision, conflictCount, vm.conflict]);
   if (
     vm.status === "loading" ||
     !vm.document ||
@@ -88,15 +98,33 @@ export default function LatencyLabView() {
           </div>
           <div className="topbar-right">
             <span
-              className={`save-state ${vm.persisted === "error" ? "save-error" : ""}`}
+              className={`save-state ${
+                vm.persisted === "error"
+                  ? "save-error"
+                  : vm.persisted === "conflict"
+                    ? "save-conflict"
+                    : ""
+              }`}
             >
               <i />
               {vm.persisted === "saving"
                 ? "保存中"
                 : vm.persisted === "error"
                   ? "保存失败"
-                  : "已保存"}
+                  : vm.persisted === "conflict"
+                    ? "存在并发冲突"
+                    : "已保存"}
             </span>
+            {vm.persisted === "conflict" && vm.conflict && !conflictOpen && (
+              <button
+                type="button"
+                className="conflict-chip"
+                onClick={() => setConflictOpen(true)}
+              >
+                <ShieldAlert size={13} />
+                {vm.conflict.conflicts.length} 处改动待处理
+              </button>
+            )}
             <span className="topbar-divider" />
             <span className="env-pill">
               <i />
@@ -119,6 +147,21 @@ export default function LatencyLabView() {
               <Sparkles size={14} /> {vm.notice}
             </span>
             <button onClick={() => vm.setNotice("")} aria-label="关闭提示">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+        {vm.syncBanner && (
+          <div
+            className={`sync-banner ${vm.syncBanner.tone === "warn" ? "sync-warn" : ""}`}
+          >
+            <span>
+              <GitCompareArrows size={14} /> {vm.syncBanner.message}
+            </span>
+            <button
+              onClick={() => vm.setSyncBanner(null)}
+              aria-label="关闭提示"
+            >
               <X size={14} />
             </button>
           </div>
@@ -207,6 +250,24 @@ export default function LatencyLabView() {
           </button>
         </footer>
       </main>
+      {vm.conflict && conflictOpen && (
+        <ConflictDialog
+          conflict={vm.conflict}
+          onResolve={(resolutions) => {
+            vm.resolveConflict(resolutions);
+            setConflictOpen(false);
+          }}
+          onDiscard={() => {
+            vm.discardLocal();
+            setConflictOpen(false);
+          }}
+          onForceOverwrite={() => {
+            void vm.forceOverwrite();
+            setConflictOpen(false);
+          }}
+          onContinueEdit={() => setConflictOpen(false)}
+        />
+      )}
     </div>
   );
 }

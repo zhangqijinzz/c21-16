@@ -36,6 +36,17 @@ export interface WorkspaceDocument {
   projects: LatencyProject[];
 }
 
+/** 落盘信封：文档内容与不可变修订号一起存储，写入时做乐观并发比对。 */
+export interface StoredWorkspace {
+  envelope: 2;
+  revision: string;
+  document: WorkspaceDocument;
+}
+
+export function newRevision(now = Date.now()): string {
+  return `rev-${now.toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
+}
+
 export type SimulationMode = "low" | "expected" | "high";
 
 export interface TimelineEntry {
