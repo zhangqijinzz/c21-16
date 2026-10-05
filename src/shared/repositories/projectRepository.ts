@@ -5,7 +5,10 @@ import {
   type ScenarioSnapshot,
   type WorkspaceDocument,
 } from "../domain/types";
-import { IndexedDbService } from "../services/indexedDbService";
+import {
+  IndexedDbService,
+  RevisionConflictError,
+} from "../services/indexedDbService";
 
 const FALLBACK_KEY = "latency-lab.workspace.v1";
 
@@ -185,65 +188,166 @@ function parseWorkspace(
   const recovered =
     projects.length !== parsed.length ||
     parsed.some((entry) => entry?.recovered);
-  return { document: { version: 1, activeProjectId, projects }, recovered };
+  // 旧版本数据没有 revision，按 0 处理，后续第一次保存会升级为新版本。
+  const revision =
+    typeof value.revision === "number" && Number.isFinite(value.revision)
+      ? Math.max(0, Math.floor(value.revision))
+      : 0;
+  return {
+    document: { version: 1, revision, activeProjectId, projects },
+    recovered,
+  };
 }
 
 export interface WorkspaceStorage {
   read(): Promise<unknown>;
-  write(value: WorkspaceDocument): Promise<void>;
+  conditionalWrite(
+    value: WorkspaceDocument,
+    expectedRevision: number | null,
+  ): Promise<WorkspaceDocument>;
+}
+
+export interface LoadResult {
+  document: WorkspaceDocument;
+  recovered: boolean;
+  /** IndexedDB 中没有任何数据；首次保存需用 null 期望值占位。 */
+  storeEmpty: boolean;
+}
+
+/**
+ * 默认存储工厂可在测试中替换（jsdom 没有 IndexedDB）。
+ * 生产环境始终使用 IndexedDbService。
+ */
+let defaultStorageFactory: () => WorkspaceStorage = () =>
+  new IndexedDbService();
+
+export function createDefaultStorage(): WorkspaceStorage {
+  return defaultStorageFactory();
+}
+
+export function setDefaultStorageFactoryForTests(
+  factory: (() => WorkspaceStorage) | null,
+): void {
+  defaultStorageFactory = factory ?? (() => new IndexedDbService());
 }
 
 export class ProjectRepository {
   constructor(
-    private readonly storage: WorkspaceStorage = new IndexedDbService(),
+    private readonly storage: WorkspaceStorage = createDefaultStorage(),
   ) {}
 
-  async load(): Promise<{ document: WorkspaceDocument; recovered: boolean }> {
+  private readFallback(): { document: WorkspaceDocument } | undefined {
+    const local = localStorage.getItem(FALLBACK_KEY);
+    if (!local) return undefined;
     try {
-      const stored = parseWorkspace(await this.storage.read());
-      if (stored) return stored;
-      const local = localStorage.getItem(FALLBACK_KEY);
-      if (local) {
-        try {
-          const fallback = parseWorkspace(JSON.parse(local) as unknown);
-          if (fallback) return { ...fallback, recovered: true };
-        } catch {
-          localStorage.removeItem(FALLBACK_KEY);
-        }
-      }
+      const fallback = parseWorkspace(JSON.parse(local) as unknown);
+      return fallback ? { document: fallback.document } : undefined;
     } catch {
-      const local = localStorage.getItem(FALLBACK_KEY);
-      if (local) {
-        try {
-          const fallback = parseWorkspace(JSON.parse(local) as unknown);
-          if (fallback) return { ...fallback, recovered: true };
-        } catch {
-          localStorage.removeItem(FALLBACK_KEY);
-        }
-      }
+      localStorage.removeItem(FALLBACK_KEY);
+      return undefined;
     }
+  }
+
+  async load(): Promise<LoadResult> {
+    let raw: unknown;
+    try {
+      raw = await this.storage.read();
+    } catch {
+      const fallback = this.readFallback();
+      if (fallback)
+        return {
+          document: fallback.document,
+          recovered: true,
+          storeEmpty: false,
+        };
+      return {
+        document: this.exampleDocument(),
+        recovered: true,
+        storeEmpty: true,
+      };
+    }
+    const stored = parseWorkspace(raw);
+    if (stored) {
+      return {
+        document: stored.document,
+        recovered: stored.recovered,
+        storeEmpty: false,
+      };
+    }
+    // 存储里有数据但解析失败：不是空库，走恢复副本；都没有则给示例，
+    // 但 storeEmpty 必须为 false，避免后续用 null 期望去覆盖损坏数据。
+    const fallback = this.readFallback();
+    if (fallback)
+      return {
+        document: fallback.document,
+        recovered: true,
+        storeEmpty: false,
+      };
+    if (raw !== undefined && raw !== null)
+      return {
+        document: this.exampleDocument(),
+        recovered: true,
+        storeEmpty: false,
+      };
     return {
-      document: {
-        version: 1,
-        activeProjectId: EXAMPLE_PROJECT.id,
-        projects: [structuredClone(EXAMPLE_PROJECT)],
-      },
+      document: this.exampleDocument(),
       recovered: true,
+      storeEmpty: true,
     };
   }
 
-  async save(document: WorkspaceDocument): Promise<void> {
+  private exampleDocument(): WorkspaceDocument {
+    return {
+      version: 1,
+      revision: 0,
+      activeProjectId: EXAMPLE_PROJECT.id,
+      projects: [structuredClone(EXAMPLE_PROJECT)],
+    };
+  }
+
+  /**
+   * 乐观并发保存：只有存储中的 revision 仍等于 expectedRevision 时才写入
+   * （expectedRevision 为 null 表示要求存储为空，用于首次写入）。
+   * 不一致时抛出 SaveConflictError，并带回对方刚保存的远端文档用于三方合并。
+   * localStorage 恢复副本只在 CAS 成功后更新，不会把未决冲突固化进去。
+   * 返回带新 revision 的已保存文档。
+   */
+  async save(
+    document: WorkspaceDocument,
+    expectedRevision: number | null,
+  ): Promise<WorkspaceDocument> {
+    let written: WorkspaceDocument | undefined;
     let indexedDbError: unknown;
     try {
-      await this.storage.write(document);
+      written = await this.storage.conditionalWrite(document, expectedRevision);
     } catch (error) {
+      if (error instanceof RevisionConflictError) {
+        const remote = parseWorkspace(error.current);
+        throw new SaveConflictError(
+          error.expectedRevision,
+          remote?.document ?? error.current,
+        );
+      }
       indexedDbError = error;
     }
+    const persisted = written ?? document;
     try {
-      localStorage.setItem(FALLBACK_KEY, JSON.stringify(document));
+      localStorage.setItem(FALLBACK_KEY, JSON.stringify(persisted));
     } catch (error) {
       if (!indexedDbError) throw error;
     }
     if (indexedDbError) throw indexedDbError;
+    return persisted;
+  }
+}
+
+/** 保存时发现存储已被另一个标签页更新。remote 是对方写入的最新文档。 */
+export class SaveConflictError extends Error {
+  constructor(
+    readonly expectedRevision: number,
+    readonly remote: unknown,
+  ) {
+    super("工作区已在其他标签页中被修改");
+    this.name = "SaveConflictError";
   }
 }

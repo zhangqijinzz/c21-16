@@ -32,6 +32,11 @@ export interface LatencyProject {
 
 export interface WorkspaceDocument {
   version: 1;
+  /**
+   * 乐观并发版本号。每次成功写入由存储层加一；载入旧数据（无此字段）时按 0 处理。
+   * 写入前用它做 compare-and-set，防止一个标签页整份覆盖另一个标签页的改动。
+   */
+  revision: number;
   activeProjectId: string;
   projects: LatencyProject[];
 }

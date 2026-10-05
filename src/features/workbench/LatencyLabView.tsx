@@ -1,5 +1,6 @@
 import {
   Activity,
+  AlertTriangle,
   Archive,
   Boxes,
   GitBranch,
@@ -11,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useLatencyLab } from "./useLatencyLab";
+import ConflictDialog from "./ConflictDialog";
 import ProjectsPanel from "../projects/ProjectsPanel";
 import GraphEditor from "../graph-editor/GraphEditor";
 import SimulationPanel from "../simulation/SimulationPanel";
@@ -88,14 +90,22 @@ export default function LatencyLabView() {
           </div>
           <div className="topbar-right">
             <span
-              className={`save-state ${vm.persisted === "error" ? "save-error" : ""}`}
+              className={`save-state ${
+                vm.persisted === "error"
+                  ? "save-error"
+                  : vm.persisted === "conflict"
+                    ? "save-conflict"
+                    : ""
+              }`}
             >
               <i />
               {vm.persisted === "saving"
                 ? "保存中"
                 : vm.persisted === "error"
                   ? "保存失败"
-                  : "已保存"}
+                  : vm.persisted === "conflict"
+                    ? "保存冲突"
+                    : "已保存"}
             </span>
             <span className="topbar-divider" />
             <span className="env-pill">
@@ -120,6 +130,21 @@ export default function LatencyLabView() {
             </span>
             <button onClick={() => vm.setNotice("")} aria-label="关闭提示">
               <X size={14} />
+            </button>
+          </div>
+        )}
+        {vm.conflict?.dismissed && (
+          <div className="conflict-banner" role="alert">
+            <span>
+              <AlertTriangle size={14} />
+              另一个标签页已保存新改动。当前页面的保存已暂停，继续编辑不会丢失，
+              但需要先决定如何合并。
+            </span>
+            <button
+              className="conflict-banner-action"
+              onClick={vm.reopenConflict}
+            >
+              查看并处理冲突
             </button>
           </div>
         )}
@@ -207,6 +232,16 @@ export default function LatencyLabView() {
           </button>
         </footer>
       </main>
+      {vm.conflict && !vm.conflict.dismissed && (
+        <ConflictDialog
+          conflict={vm.conflict}
+          onChoose={vm.resolveConflict}
+          onChooseAll={vm.resolveAllConflicts}
+          onMerge={vm.mergeAndSave}
+          onReload={vm.reloadFromRemote}
+          onDismiss={vm.dismissConflict}
+        />
+      )}
     </div>
   );
 }

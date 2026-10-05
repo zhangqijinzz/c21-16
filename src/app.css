@@ -2533,3 +2533,223 @@ button:disabled {
     line-height: 1.5;
   }
 }
+
+/* ---- 跨标签页保存冲突 ---- */
+.save-state.save-conflict {
+  color: #b15a12;
+  background: #fdf1e1;
+}
+.save-state.save-conflict i {
+  background: #e08a3c;
+}
+.conflict-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 42px;
+  color: #8a4c14;
+  background: #fdf2e2;
+  border-bottom: 1px solid #f3ddc0;
+  font-size: 10px;
+}
+.conflict-banner > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.conflict-banner-action {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  color: #fff;
+  background: #d07e36;
+  border: 0;
+  border-radius: 6px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.conflict-banner-action:hover {
+  background: #bd6f2c;
+}
+.conflict-dialog {
+  width: min(560px, 100%);
+  max-height: min(82vh, 680px);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 22px;
+}
+.conflict-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.conflict-head > div {
+  flex: 1;
+  min-width: 0;
+}
+.conflict-head h2 {
+  margin: 2px 0 4px;
+}
+.conflict-head p {
+  font-size: 10px;
+}
+.conflict-icon {
+  flex: 0 0 auto;
+  color: #c87e2e;
+  background: #fdf0dd;
+}
+.conflict-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  color: #9aa39b;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.conflict-close:hover {
+  background: #f4f6f1;
+  color: #5a665c;
+}
+.conflict-auto {
+  margin-top: 14px;
+  padding: 10px 12px;
+  color: #4f6b42;
+  background: #f2f7e8;
+  border: 1px solid #e3ecd2;
+  border-radius: 9px;
+}
+.conflict-auto strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+}
+.conflict-auto ul {
+  margin: 7px 0 0;
+  padding-left: 16px;
+  color: #6c815c;
+  font-size: 9px;
+  line-height: 1.7;
+}
+.conflict-groups {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.conflict-bulk {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 8px;
+  color: #96a095;
+  font-size: 9px;
+}
+.conflict-bulk div {
+  display: flex;
+  gap: 10px;
+}
+.conflict-scroll {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding-right: 4px;
+  min-height: 60px;
+  max-height: 300px;
+}
+.conflict-group {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #e8ede4;
+  border-radius: 10px;
+}
+.conflict-group legend {
+  padding: 0 6px;
+  color: #56645a;
+  font-size: 9px;
+  font-weight: 600;
+}
+.conflict-row {
+  display: grid;
+  grid-template-columns: 64px 1fr 1fr;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 8px;
+}
+.conflict-row:first-of-type {
+  margin-top: 4px;
+}
+.conflict-field {
+  display: flex;
+  align-items: center;
+  color: #8b968d;
+  font-size: 9px;
+}
+.conflict-option {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  text-align: left;
+  background: #fafbf8;
+  border: 1px solid #e7ece3;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.conflict-option em {
+  color: #a0aaa1;
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 0.3px;
+}
+.conflict-option b {
+  color: #4a594f;
+  font-size: 10px;
+  font-weight: 600;
+  word-break: break-word;
+}
+.conflict-option:hover {
+  border-color: #b9c9a4;
+}
+.conflict-option.is-picked {
+  background: #f0f6e3;
+  border-color: #9fbe72;
+  box-shadow: 0 0 0 1px #9fbe72;
+}
+.conflict-option.theirs.is-picked {
+  background: #eef3f6;
+  border-color: #8fb0c2;
+  box-shadow: 0 0 0 1px #8fb0c2;
+}
+.conflict-clean {
+  margin-top: 14px;
+  padding: 16px;
+  text-align: center;
+  color: #5e7a4b;
+  background: #f2f7e8;
+  border: 1px dashed #cdddb4;
+  border-radius: 10px;
+  font-size: 10px;
+}
+.conflict-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #eef1ec;
+}
+.conflict-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
